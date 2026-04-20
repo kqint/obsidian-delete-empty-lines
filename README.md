@@ -14,8 +14,8 @@ Delete or compress empty lines in your notes, for either the whole document or t
 
 ## Commands
 
-- `Compress empty lines (Full document, keep {count})`
-- `Compress empty lines (Selection, keep {count})`
+- Compress empty lines (Full document, keep {count})
+- Compress empty lines (Selection, keep {count})
 
 The `{count}` value follows your settings.
 
@@ -24,14 +24,6 @@ The `{count}` value follows your settings.
 - If text is selected: show selection command
 - If no text is selected: show full document command
 
-## Settings
-
-- `Language`: `English` (default), `简体中文`, or `Auto (follow Obsidian)`
-- `Delete lines with only whitespace`
-- `Default max consecutive empty lines (Full document)`
-- `Default max consecutive empty lines (Selection)`
-
-Language changes apply immediately.
 
 ## Installation
 
