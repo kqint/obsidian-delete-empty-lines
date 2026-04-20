@@ -1,7 +1,7 @@
 {
     "id": "delete-empty-lines",
     "name": "Delete Empty Lines",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "minAppVersion": "0.15.0",
     "description": "Delete empty lines in notes, and support compressing multiple consecutive empty lines into a configurable number of empty lines.",
     "author": "kqint",

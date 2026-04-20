@@ -1,0 +1,61 @@
+{
+  "plugin": {
+    "name": "Delete Empty Lines",
+    "description": "Delete or compress empty lines in notes"
+  },
+  "commands": {
+    "fullDefault": {
+      "name": "Compress empty lines (Full document, keep {count})"
+    },
+    "selectionDefault": {
+      "name": "Compress empty lines (Selection, keep {count})"
+    }
+  },
+  "contextMenu": {
+    "fullDocument": "Compress empty lines in document (keep {count})",
+    "selection": "Compress empty lines in selection (keep {count})"
+  },
+  "notices": {
+    "noActiveFile": "No active file",
+    "noEditor": "No editor found",
+    "noSelection": "Please select text first",
+    "processSuccess": "Processed (keep up to {count} consecutive empty lines)",
+    "noEmptyLines": "No empty lines to process",
+    "processFailed": "Processing failed: {error}",
+    "invalidNumber": "Please enter a non-negative integer",
+    "pluginLoaded": "Delete Empty Lines plugin loaded",
+    "pluginUnloaded": "Delete Empty Lines plugin unloaded",
+    "languageChanged": "Language switched to {language}"
+  },
+  "settings": {
+    "title": "Delete Empty Lines Settings",
+    "language": {
+      "name": "Language",
+      "desc": "Choose display language. Changes take effect immediately.",
+      "options": {
+        "auto": "Auto (follow Obsidian)",
+        "zh": "Simplified Chinese",
+        "en": "English"
+      }
+    },
+    "preserveIndentation": {
+      "name": "Delete lines with only whitespace",
+      "desc": "When enabled, lines containing only spaces and tabs are treated as empty lines and deleted."
+    },
+    "defaultFullMaxLines": {
+      "name": "Default max consecutive empty lines (Full document)",
+      "desc": "Maximum number of consecutive empty lines to keep when processing the entire document (0 = delete all)"
+    },
+    "defaultSelectionMaxLines": {
+      "name": "Default max consecutive empty lines (Selection)",
+      "desc": "Maximum number of consecutive empty lines to keep when processing selected text (0 = delete all)"
+    },
+    "usage": {
+      "title": "Usage Instructions",
+      "commandPalette": "Command Palette",
+      "commandPaletteDesc": "Press Ctrl/Cmd+P and search for \"compress empty lines\".",
+      "contextMenu": "Context Menu",
+      "contextMenuDesc": "Right-click in the editor to see the matching compress command."
+    }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "plugin": {
+    "name": "删除空行",
+    "description": "删除或压缩笔记中的空行"
+  },
+  "commands": {
+    "fullDefault": {
+      "name": "压缩空行（全文，保留 {count} 行）"
+    },
+    "selectionDefault": {
+      "name": "压缩空行（选中区域，保留 {count} 行）"
+    }
+  },
+  "contextMenu": {
+    "fullDocument": "压缩全文空行（保留 {count} 行）",
+    "selection": "压缩选中区域空行（保留 {count} 行）"
+  },
+  "notices": {
+    "noActiveFile": "没有打开的文件",
+    "noEditor": "未找到编辑器",
+    "noSelection": "请先选中要处理的文本",
+    "processSuccess": "处理完成（最多保留连续 {count} 行空行）",
+    "noEmptyLines": "没有需要处理的空行",
+    "processFailed": "处理失败：{error}",
+    "invalidNumber": "请输入大于等于 0 的整数",
+    "pluginLoaded": "删除空行插件已加载",
+    "pluginUnloaded": "删除空行插件已卸载",
+    "languageChanged": "界面语言已切换为 {language}"
+  },
+  "settings": {
+    "title": "删除空行设置",
+    "language": {
+      "name": "界面语言",
+      "desc": "选择显示语言，修改后立即生效。",
+      "options": {
+        "auto": "自动（跟随 Obsidian）",
+        "zh": "简体中文",
+        "en": "English"
+      }
+    },
+    "preserveIndentation": {
+      "name": "删除仅包含空格和制表符的空行",
+      "desc": "开启后，仅包含空格和制表符的行会被视为空行并删除。"
+    },
+    "defaultFullMaxLines": {
+      "name": "全文默认最大连续空行数",
+      "desc": "处理整个文档时，最多保留的连续空行数（0 = 删除所有空行）"
+    },
+    "defaultSelectionMaxLines": {
+      "name": "选中区域默认最大连续空行数",
+      "desc": "处理选中文本时，最多保留的连续空行数（0 = 删除所有空行）"
+    },
+    "usage": {
+      "title": "使用说明",
+      "commandPalette": "命令面板",
+      "commandPaletteDesc": "按 Ctrl/Cmd+P，搜索“压缩空行”以执行命令。",
+      "contextMenu": "右键菜单",
+      "contextMenuDesc": "在编辑器中右键，会根据是否有选中文本显示对应命令。"
+    }
+  }
+}

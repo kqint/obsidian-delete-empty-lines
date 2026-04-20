@@ -1,54 +1,103 @@
 const { Plugin, PluginSettingTab, Setting, Notice, MarkdownView } = require('obsidian');
 
+const BUILT_IN_LOCALES = {
+    en: {
+        commands: {
+            fullDefault: { name: 'Compress empty lines (Full document, keep {count})' },
+            selectionDefault: { name: 'Compress empty lines (Selection, keep {count})' }
+        },
+        contextMenu: {
+            fullDocument: 'Compress empty lines in document (keep {count})',
+            selection: 'Compress empty lines in selection (keep {count})'
+        },
+        notices: {
+            noActiveFile: 'No active file',
+            noEditor: 'No editor found',
+            noSelection: 'Please select text first',
+            processSuccess: 'Processed (keep up to {count} consecutive empty lines)',
+            noEmptyLines: 'No empty lines to process',
+            processFailed: 'Processing failed: {error}',
+            invalidNumber: 'Please enter a non-negative integer',
+            pluginLoaded: 'Delete Empty Lines plugin loaded',
+            pluginUnloaded: 'Delete Empty Lines plugin unloaded',
+            languageChanged: 'Language switched to {language}'
+        },
+        settings: {
+            title: 'Delete Empty Lines Settings',
+            language: {
+                name: 'Language',
+                desc: 'Choose display language. Changes take effect immediately.',
+                options: {
+                    auto: 'Auto',
+                    zh: 'Simplified Chinese',
+                    en: 'English'
+                }
+            },
+            preserveIndentation: {
+                name: 'Delete lines with only whitespace',
+                desc: 'When enabled, lines containing only spaces and tabs are treated as empty lines and deleted.'
+            },
+            defaultFullMaxLines: {
+                name: 'Default max consecutive empty lines (Full document)',
+                desc: 'Maximum number of consecutive empty lines to keep when processing the entire document (0 = delete all)'
+            },
+            defaultSelectionMaxLines: {
+                name: 'Default max consecutive empty lines (Selection)',
+                desc: 'Maximum number of consecutive empty lines to keep when processing selected text (0 = delete all)'
+            },
+            usage: {
+                title: 'Usage Instructions',
+                commandPalette: 'Command Palette',
+                commandPaletteDesc: 'Press Ctrl/Cmd+P and search for "compress empty lines".',
+                contextMenu: 'Context Menu',
+                contextMenuDesc: 'Right-click in the editor to see the matching compress command.'
+            }
+        }
+    }
+};
+
 const DEFAULT_SETTINGS = {
+    language: 'en',
     preserveIndentation: true,
-    preserveListIndentation: true,
-    defaultFullMaxLines: 0,      // 全文默认最大连续空行数
-    defaultSelectionMaxLines: 0   // 选中区域默认最大连续空行数
-}
+    defaultFullMaxLines: 0,
+    defaultSelectionMaxLines: 0
+};
 
 module.exports = class DeleteEmptyLinesPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
+        await this.initI18n();
 
-        // 动态更新命令名称的函数
         this.updateCommands = () => {
-            // 移除旧命令（如果有）
             this.removeCommand('full-default');
             this.removeCommand('selection-default');
-            
-            // 添加全文命令
+
             this.addCommand({
                 id: 'full-default',
-                name: `压缩空行（全文，保留 ${this.settings.defaultFullMaxLines} 行）`,
+                name: this.t('commands.fullDefault.name', { count: this.settings.defaultFullMaxLines }),
                 callback: () => this.processDocument(this.settings.defaultFullMaxLines)
             });
 
-            // 添加选中区域命令
             this.addCommand({
                 id: 'selection-default',
-                name: `压缩空行（选中区域，保留 ${this.settings.defaultSelectionMaxLines} 行）`,
+                name: this.t('commands.selectionDefault.name', { count: this.settings.defaultSelectionMaxLines }),
                 callback: () => this.processSelection(this.settings.defaultSelectionMaxLines)
             });
         };
 
-        // 初始化命令
         this.updateCommands();
 
-        // 右键菜单
         this.registerEvent(
-            this.app.workspace.on('editor-menu', (menu, editor, view) => {
+            this.app.workspace.on('editor-menu', (menu, editor) => {
                 if (editor.somethingSelected()) {
-                    // 有选中文本：显示选中区域操作
                     menu.addItem((item) => {
-                        item.setTitle(`压缩选中区域空行（保留 ${this.settings.defaultSelectionMaxLines} 行）`)
+                        item.setTitle(this.t('contextMenu.selection', { count: this.settings.defaultSelectionMaxLines }))
                             .setIcon('minimize-2')
                             .onClick(() => this.processSelection(this.settings.defaultSelectionMaxLines, editor));
                     });
                 } else {
-                    // 无选中：显示全文操作
                     menu.addItem((item) => {
-                        item.setTitle(`压缩全文空行（保留 ${this.settings.defaultFullMaxLines} 行）`)
+                        item.setTitle(this.t('contextMenu.fullDocument', { count: this.settings.defaultFullMaxLines }))
                             .setIcon('minimize-2')
                             .onClick(() => this.processDocument(this.settings.defaultFullMaxLines));
                     });
@@ -56,17 +105,91 @@ module.exports = class DeleteEmptyLinesPlugin extends Plugin {
             })
         );
 
-        // 设置选项卡
-        this.addSettingTab(new DeleteEmptyLinesSettingTab(this.app, this));
+        this.settingTab = new DeleteEmptyLinesSettingTab(this.app, this);
+        this.addSettingTab(this.settingTab);
+
+        console.log(this.t('notices.pluginLoaded'));
     }
 
-    /**
-     * 处理整个文档
-     */
+    async initI18n() {
+        const language = this.resolveLanguage(this.settings.language);
+        this.currentLang = language;
+        this.localeData = await this.loadLocale(language);
+    }
+
+    resolveLanguage(languageSetting) {
+        if (languageSetting !== 'auto') {
+            return languageSetting;
+        }
+
+        const obsidianLang = (
+            window.localStorage.getItem('language') ||
+            navigator.language ||
+            'en'
+        ).toLowerCase();
+
+        return obsidianLang.startsWith('zh') ? 'zh' : 'en';
+    }
+
+    async loadLocale(language) {
+        try {
+            const localePath = `${this.manifest.dir}/locales/${language}.json`;
+            const content = await this.app.vault.adapter.read(localePath);
+            return JSON.parse(content);
+        } catch (error) {
+            console.warn(`[delete-empty-lines] Failed to load locale "${language}", using fallback.`, error);
+            return BUILT_IN_LOCALES[language] || BUILT_IN_LOCALES.en;
+        }
+    }
+
+    getNestedValue(source, key) {
+        return key.split('.').reduce((acc, currentKey) => {
+            if (acc && typeof acc === 'object' && currentKey in acc) {
+                return acc[currentKey];
+            }
+            return undefined;
+        }, source);
+    }
+
+    getLocaleValue(key) {
+        return (
+            this.getNestedValue(this.localeData, key) ||
+            this.getNestedValue(BUILT_IN_LOCALES[this.currentLang], key) ||
+            this.getNestedValue(BUILT_IN_LOCALES.en, key)
+        );
+    }
+
+    t(key, params = {}) {
+        let value = this.getLocaleValue(key) || key;
+
+        if (typeof value !== 'string') {
+            value = key;
+        }
+
+        return value.replace(/\{(\w+)\}/g, (match, paramKey) => {
+            return params[paramKey] !== undefined ? String(params[paramKey]) : match;
+        });
+    }
+
+    async setLanguage(language) {
+        this.settings.language = language;
+        await this.initI18n();
+        await this.saveSettings();
+
+        if (this.settingTab) {
+            this.settingTab.display();
+        }
+
+        const options = this.getLocaleValue('settings.language.options') || {};
+        const fallbackOptions = { auto: 'Auto', zh: 'Simplified Chinese', en: 'English' };
+        const languageLabel = options[language] || fallbackOptions[language] || language;
+        new Notice(this.t('notices.languageChanged', { language: languageLabel }));
+    }
+
     async processDocument(maxLines) {
         const activeFile = this.app.workspace.getActiveFile();
         if (!activeFile) {
-            new Notice('没有打开的文件');
+            new Notice(this.t('notices.noActiveFile'));
             return;
         }
 
@@ -76,31 +199,28 @@ module.exports = class DeleteEmptyLinesPlugin extends Plugin {
 
             if (content !== processedContent) {
                 await this.app.vault.modify(activeFile, processedContent);
-                new Notice(`空行处理完成（保留 ≤${maxLines} 行）`);
+                new Notice(this.t('notices.processSuccess', { count: maxLines }));
             } else {
-                new Notice('没有需要处理的空行');
+                new Notice(this.t('notices.noEmptyLines'));
             }
         } catch (error) {
-            new Notice('处理失败: ' + error.message);
-            console.error('处理空行失败:', error);
+            new Notice(this.t('notices.processFailed', { error: error.message }));
+            console.error('Processing failed:', error);
         }
     }
 
-    /**
-     * 处理选中区域
-     */
     async processSelection(maxLines, editor) {
         if (!editor) {
             const view = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (!view) {
-                new Notice('没有找到编辑器');
+                new Notice(this.t('notices.noEditor'));
                 return;
             }
             editor = view.editor;
         }
 
         if (!editor.somethingSelected()) {
-            new Notice('请先选中要处理的文本');
+            new Notice(this.t('notices.noSelection'));
             return;
         }
 
@@ -109,27 +229,22 @@ module.exports = class DeleteEmptyLinesPlugin extends Plugin {
 
         if (selection !== processed) {
             editor.replaceSelection(processed);
-            new Notice(`选中区域处理完成（保留 ≤${maxLines} 行）`);
+            new Notice(this.t('notices.processSuccess', { count: maxLines }));
         } else {
-            new Notice('选中区域没有需要处理的空行');
+            new Notice(this.t('notices.noEmptyLines'));
         }
     }
 
-    /**
-     * 核心文本处理函数
-     */
     processText(text, maxEmptyLines) {
         const lines = text.split('\n');
         const processedLines = [];
         let emptyLineCount = 0;
 
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-
+        for (const line of lines) {
             if (this.isEmptyLine(line)) {
-                emptyLineCount++;
+                emptyLineCount += 1;
                 if (emptyLineCount <= maxEmptyLines) {
-                    processedLines.push(''); // 保留空行
+                    processedLines.push('');
                 }
             } else {
                 emptyLineCount = 0;
@@ -137,13 +252,15 @@ module.exports = class DeleteEmptyLinesPlugin extends Plugin {
             }
         }
 
-        // 处理末尾空行（不超过 maxEmptyLines）
-        // 简单方法：如果末尾空行数超过 maxEmptyLines，则裁剪
         let tailEmpty = 0;
-        for (let i = processedLines.length - 1; i >= 0; i--) {
-            if (this.isEmptyLine(processedLines[i])) tailEmpty++;
-            else break;
+        for (let i = processedLines.length - 1; i >= 0; i -= 1) {
+            if (this.isEmptyLine(processedLines[i])) {
+                tailEmpty += 1;
+            } else {
+                break;
+            }
         }
+
         if (tailEmpty > maxEmptyLines) {
             processedLines.splice(processedLines.length - (tailEmpty - maxEmptyLines));
         }
@@ -154,9 +271,8 @@ module.exports = class DeleteEmptyLinesPlugin extends Plugin {
     isEmptyLine(line) {
         if (this.settings.preserveIndentation) {
             return line.trim() === '';
-        } else {
-            return line === '';
         }
+        return line === '';
     }
 
     async loadSettings() {
@@ -165,14 +281,15 @@ module.exports = class DeleteEmptyLinesPlugin extends Plugin {
 
     async saveSettings() {
         await this.saveData(this.settings);
-        // 设置保存后，更新命令名称以反映新数值
-        this.updateCommands();
+        if (this.updateCommands) {
+            this.updateCommands();
+        }
     }
 
     onunload() {
-        console.log('空行删除插件已卸载');
+        console.log(this.t('notices.pluginUnloaded'));
     }
-}
+};
 
 class DeleteEmptyLinesSettingTab extends PluginSettingTab {
     constructor(app, plugin) {
@@ -184,63 +301,73 @@ class DeleteEmptyLinesSettingTab extends PluginSettingTab {
         const { containerEl } = this;
         containerEl.empty();
 
-        containerEl.createEl('h2', { text: '空行删除设置' });
+        containerEl.createEl('h2', { text: this.plugin.t('settings.title') });
 
-        // 保留缩进空行选项
         new Setting(containerEl)
-            .setName('删除只包含空格和制表符的空行')
-            .setDesc('开启后，只包含空格和制表符的行，会被视为空行；关闭后，会被视为非空行。例如，一行中只有5个空格，没有其他字符。开启该选项，该行在操作时会被删除，关闭选项，则会被保留。')
-            .addToggle(toggle => toggle
+            .setName(this.plugin.t('settings.language.name'))
+            .setDesc(this.plugin.t('settings.language.desc'))
+            .addDropdown((dropdown) => {
+                const options = this.plugin.getLocaleValue('settings.language.options') || {};
+                dropdown.addOption('auto', options.auto || 'Auto');
+                dropdown.addOption('zh', options.zh || 'Simplified Chinese');
+                dropdown.addOption('en', options.en || 'English');
+                dropdown.setValue(this.plugin.settings.language);
+                dropdown.onChange(async (value) => {
+                    await this.plugin.setLanguage(value);
+                });
+            });
+
+        new Setting(containerEl)
+            .setName(this.plugin.t('settings.preserveIndentation.name'))
+            .setDesc(this.plugin.t('settings.preserveIndentation.desc'))
+            .addToggle((toggle) => toggle
                 .setValue(this.plugin.settings.preserveIndentation)
                 .onChange(async (value) => {
                     this.plugin.settings.preserveIndentation = value;
                     await this.plugin.saveSettings();
                 }));
 
-        // 全文默认最大连续空行数
         new Setting(containerEl)
-            .setName('全文默认最大连续空行数')
-            .setDesc('处理整个文档时，保留的最大连续空行数（0 = 删除所有空行）')
-            .addText(text => text
+            .setName(this.plugin.t('settings.defaultFullMaxLines.name'))
+            .setDesc(this.plugin.t('settings.defaultFullMaxLines.desc'))
+            .addText((text) => text
                 .setValue(String(this.plugin.settings.defaultFullMaxLines))
-                .setPlaceholder('输入 ≥0 的整数')
+                .setPlaceholder('>=0')
                 .onChange(async (value) => {
                     const num = parseInt(value, 10);
-                    if (!isNaN(num) && num >= 0) {
+                    if (!Number.isNaN(num) && num >= 0) {
                         this.plugin.settings.defaultFullMaxLines = num;
                         await this.plugin.saveSettings();
-                        // 刷新显示（可选）
                         this.display();
                     } else {
                         text.setValue(String(this.plugin.settings.defaultFullMaxLines));
-                        new Notice('请输入大于等于0的整数');
+                        new Notice(this.plugin.t('notices.invalidNumber'));
                     }
                 }));
 
-        // 选中区域默认最大连续空行数
         new Setting(containerEl)
-            .setName('选中区域默认最大连续空行数')
-            .setDesc('处理选中文本时，保留的最大连续空行数（0 = 删除所有空行）')
-            .addText(text => text
+            .setName(this.plugin.t('settings.defaultSelectionMaxLines.name'))
+            .setDesc(this.plugin.t('settings.defaultSelectionMaxLines.desc'))
+            .addText((text) => text
                 .setValue(String(this.plugin.settings.defaultSelectionMaxLines))
-                .setPlaceholder('输入 ≥0 的整数')
+                .setPlaceholder('>=0')
                 .onChange(async (value) => {
                     const num = parseInt(value, 10);
-                    if (!isNaN(num) && num >= 0) {
+                    if (!Number.isNaN(num) && num >= 0) {
                         this.plugin.settings.defaultSelectionMaxLines = num;
                         await this.plugin.saveSettings();
                         this.display();
                     } else {
                         text.setValue(String(this.plugin.settings.defaultSelectionMaxLines));
-                        new Notice('请输入大于等于0的整数');
+                        new Notice(this.plugin.t('notices.invalidNumber'));
                     }
                 }));
 
-        containerEl.createEl('h3', { text: '使用说明' });
+        containerEl.createEl('h3', { text: this.plugin.t('settings.usage.title') });
         const usageEl = containerEl.createEl('div', { cls: 'setting-item-description' });
         usageEl.innerHTML = `
-            <p><strong>命令面板</strong>：按 Ctrl/Cmd+P，搜索“压缩空行”即可看到两个动态命令（全文和选中区域），命令名称中会显示当前设置的保留空行数。</p>
-            <p><strong>右键菜单</strong>：在编辑器中右键，会根据是否有选中文本显示对应的压缩命令。</p>
+            <p><strong>${this.plugin.t('settings.usage.commandPalette')}:</strong> ${this.plugin.t('settings.usage.commandPaletteDesc')}</p>
+            <p><strong>${this.plugin.t('settings.usage.contextMenu')}:</strong> ${this.plugin.t('settings.usage.contextMenuDesc')}</p>
         `;
     }
 }
