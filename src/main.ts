@@ -18,9 +18,13 @@ type LocaleTree = Record<string, unknown>;
 
 interface DeleteEmptyLinesSettings {
     language: Language;
-    preserveIndentation: boolean;
+    whitespaceOnlyLinesAsEmpty: boolean;
     defaultFullMaxLines: number;
     defaultSelectionMaxLines: number;
+}
+
+interface StoredDeleteEmptyLinesSettings extends Partial<DeleteEmptyLinesSettings> {
+    preserveIndentation?: boolean;
 }
 
 const BUILT_IN_LOCALES: Readonly<Record<ResolvedLanguage, LocaleTree>> = Object.freeze({
@@ -29,8 +33,8 @@ const BUILT_IN_LOCALES: Readonly<Record<ResolvedLanguage, LocaleTree>> = Object.
 });
 
 const DEFAULT_SETTINGS: DeleteEmptyLinesSettings = {
-    language: 'en',
-    preserveIndentation: true,
+    language: 'auto',
+    whitespaceOnlyLinesAsEmpty: true,
     defaultFullMaxLines: 0,
     defaultSelectionMaxLines: 0
 };
@@ -261,15 +265,20 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
     }
 
     isEmptyLine(line: string): boolean {
-        if (this.settings.preserveIndentation) {
+        if (this.settings.whitespaceOnlyLinesAsEmpty) {
             return line.trim() === '';
         }
         return line === '';
     }
 
     async loadSettings(): Promise<void> {
-        const saved = (await this.loadData()) as Partial<DeleteEmptyLinesSettings> | null;
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, saved ?? {});
+        const saved = (await this.loadData()) as StoredDeleteEmptyLinesSettings | null;
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, saved ?? {}, {
+            whitespaceOnlyLinesAsEmpty:
+                saved?.whitespaceOnlyLinesAsEmpty ??
+                saved?.preserveIndentation ??
+                DEFAULT_SETTINGS.whitespaceOnlyLinesAsEmpty,
+        });
         this.settings.language = this.normalizeLanguage(this.settings.language);
     }
 
@@ -318,13 +327,13 @@ class DeleteEmptyLinesSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
-            .setName(this.plugin.t('settings.preserveIndentation.name'))
-            .setDesc(this.plugin.t('settings.preserveIndentation.desc'))
+            .setName(this.plugin.t('settings.whitespaceOnlyLinesAsEmpty.name'))
+            .setDesc(this.plugin.t('settings.whitespaceOnlyLinesAsEmpty.desc'))
             .addToggle((toggle) => {
                 toggle
-                    .setValue(this.plugin.settings.preserveIndentation)
+                    .setValue(this.plugin.settings.whitespaceOnlyLinesAsEmpty)
                     .onChange(async (value) => {
-                        this.plugin.settings.preserveIndentation = value;
+                        this.plugin.settings.whitespaceOnlyLinesAsEmpty = value;
                         await this.plugin.saveSettings();
                     });
             });
@@ -371,9 +380,13 @@ class DeleteEmptyLinesSettingTab extends PluginSettingTab {
 
         containerEl.createEl('h3', { text: this.plugin.t('settings.usage.title') });
         const usageEl = containerEl.createEl('div', { cls: 'setting-item-description' });
-        usageEl.innerHTML = `
-            <p><strong>${this.plugin.t('settings.usage.commandPalette')}:</strong> ${this.plugin.t('settings.usage.commandPaletteDesc')}</p>
-            <p><strong>${this.plugin.t('settings.usage.contextMenu')}:</strong> ${this.plugin.t('settings.usage.contextMenuDesc')}</p>
-        `;
+        this.createUsageParagraph(usageEl, 'settings.usage.commandPalette', 'settings.usage.commandPaletteDesc');
+        this.createUsageParagraph(usageEl, 'settings.usage.contextMenu', 'settings.usage.contextMenuDesc');
+    }
+
+    createUsageParagraph(containerEl: HTMLElement, labelKey: string, descKey: string): void {
+        const paragraph = containerEl.createEl('p');
+        paragraph.createEl('strong', { text: `${this.plugin.t(labelKey)}: ` });
+        paragraph.appendChild(document.createTextNode(this.plugin.t(descKey)));
     }
 }

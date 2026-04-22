@@ -39,7 +39,7 @@
       }
     },
     "numberInputPlaceholder": ">=0",
-    "preserveIndentation": {
+    "whitespaceOnlyLinesAsEmpty": {
       "name": "删除仅包含空格和制表符的空行",
       "desc": "开启后，仅包含空格和制表符的行会被视为空行并删除。"
     },

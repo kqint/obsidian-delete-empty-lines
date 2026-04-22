@@ -39,7 +39,7 @@
       }
     },
     "numberInputPlaceholder": ">=0",
-    "preserveIndentation": {
+    "whitespaceOnlyLinesAsEmpty": {
       "name": "Delete lines with only whitespace",
       "desc": "When enabled, lines containing only spaces and tabs are treated as empty lines and deleted."
     },

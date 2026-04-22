@@ -50,3 +50,5 @@
 - 当前项目是 Obsidian 插件，源码入口为 `src/main.ts`，发布入口为构建产物 `main.js`。
 - i18n 采用插件内统一 `t(key, params)` 调用；面向用户文案集中在 `commands`、`contextMenu`、`notices`、`settings` 命名空间。
 - `locales/en.json` 与 `locales/zh-CN.json` 作为语言源文件维护；通过 `npm run build`（esbuild）从独立语言文件打包到 `main.js`，运行时不从外部读取语言文件，且源码中不直接硬编码完整语言对象。
+`whitespaceOnlyLinesAsEmpty`，并兼容历史 `preserveIndentation` 配置迁移。
+- `package.json` 提供 `build` 与 `lint` 脚本，开发时至少执行静态检查与构建验证。
