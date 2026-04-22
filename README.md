@@ -31,6 +31,14 @@ The `{count}` value follows your settings.
 
 ## Installation
 
+### Installation using BRAT (Recommended)
+
+1. Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin from Community Plugins.
+2. Open BRAT settings, click `Add Beta plugin` in `Beta plugin list`, add this repository in `Repository`:
+   `kqint/obsidian-delete-empty-lines`, and install the latest version.
+3. Enable the plugin in Community Plugins.
+4. Updates will be automatically installed.
+
 ### Manual
 
 1. Download `main.js` and `manifest.json` from [releases/latest](https://github.com/kqint/obsidian-delete-empty-lines/releases/latest).

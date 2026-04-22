@@ -31,6 +31,14 @@
 
 ## 安装
 
+### 使用 BRAT 安装（推荐）
+
+1. 从社区插件安装 [BRAT](https://github.com/TfTHacker/obsidian42-brat) 插件。
+2. 打开 BRAT 设置，在 `Beta plugin list` 点击 `Add Beta plugin`，在 `Repository` 中并添加此仓库：
+`kqint/obsidian-delete-empty-lines`，选择 Latest version 安装。
+3. 在社区插件中启用本插件。
+4. 更新将自动安装。
+
 ### 手动安装
 
 1. 在 [releases/latest](https://github.com/kqint/obsidian-delete-empty-lines/releases/latest) 下载 `main.js` 和 `manifest.json`。
