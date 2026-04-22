@@ -4,6 +4,10 @@ Delete or compress empty lines in your notes. Supports processing the entire doc
 
 [中文文档](./README.zh-CN.md)
 
+## Demo
+
+![Demo](assets/demo.gif)
+
 ## Features
 
 - Full document processing

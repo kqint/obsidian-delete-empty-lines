@@ -4,6 +4,10 @@
 
 [English](./README.md)
 
+## 演示
+
+![Demo](assets/demo.gif)
+
 ## 功能
 
 - 处理全文空行
