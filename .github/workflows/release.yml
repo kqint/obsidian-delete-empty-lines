@@ -2,6 +2,7 @@
 
 name: Release Obsidian plugin
 on:
+  workflow_dispatch:
   push:
     tags:
       - "*"
@@ -16,14 +17,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      # 检出代码，使用v5版本
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       # 设置Node.js环境，使用v4版本。它会自动检测packageManager字段并开启缓存
       - uses: actions/setup-node@v4
         with:
-          node-version: "22.x" # 或 "20.x"，根据你的项目实际需求设置
-
+          node-version: "20.x"
       # 安装依赖
       - name: Install dependencies
         run: npm ci
