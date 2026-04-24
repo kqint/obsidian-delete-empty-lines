@@ -1,6 +1,6 @@
 {
   "name": "obsidian-delete-empty-lines",
-  "version": "2.0.1",
+  "version": "refs/heads/main",
   "private": true,
   "scripts": {
     "build": "esbuild src/main.ts --bundle --platform=node --format=cjs --target=es2018 --external:obsidian --outfile=main.js",
