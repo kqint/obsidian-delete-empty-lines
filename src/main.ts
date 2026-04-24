@@ -1,50 +1,35 @@
 import {
-    App,
     Editor,
     MarkdownView,
     Notice,
-    Plugin,
-    PluginSettingTab,
-    Setting
+    Plugin
 } from 'obsidian';
 
-import enLocale from '../locales/en.json';
-import zhCnLocale from '../locales/zh-CN.json';
+import { I18nManager } from './i18n';
+import { DeleteEmptyLinesSettingTab, PluginInterface } from './settings-tab';
+import { processText } from './text-processor';
+import { DEFAULT_SETTINGS } from './types';
+import type {
+    DeleteEmptyLinesSettings,
+    LocaleTree,
+    ResolvedLanguage,
+    StoredDeleteEmptyLinesSettings,
+    TranslationParams
+} from './types';
 
-type Language = 'auto' | 'en' | 'zh-CN';
-type ResolvedLanguage = 'en' | 'zh-CN';
-type TranslationParams = Record<string, string | number>;
-type LocaleTree = Record<string, unknown>;
-
-interface DeleteEmptyLinesSettings {
-    language: Language;
-    whitespaceOnlyLinesAsEmpty: boolean;
-    defaultFullMaxLines: number;
-    defaultSelectionMaxLines: number;
-}
-
-interface StoredDeleteEmptyLinesSettings extends Partial<DeleteEmptyLinesSettings> {
-    preserveIndentation?: boolean;
-}
-
-const BUILT_IN_LOCALES: Readonly<Record<ResolvedLanguage, LocaleTree>> = Object.freeze({
-    en: enLocale as LocaleTree,
-    'zh-CN': zhCnLocale as LocaleTree
-});
-
-const DEFAULT_SETTINGS: DeleteEmptyLinesSettings = {
-    language: 'auto',
-    whitespaceOnlyLinesAsEmpty: true,
-    defaultFullMaxLines: 0,
-    defaultSelectionMaxLines: 0
-};
-
-export default class DeleteEmptyLinesPlugin extends Plugin {
+export default class DeleteEmptyLinesPlugin extends Plugin implements PluginInterface {
     settings: DeleteEmptyLinesSettings = { ...DEFAULT_SETTINGS };
-    currentLang: ResolvedLanguage = 'en';
-    localeData: LocaleTree = BUILT_IN_LOCALES.en;
+    i18n: I18nManager = new I18nManager();
     settingTab?: DeleteEmptyLinesSettingTab;
     updateCommands?: () => void;
+
+    get currentLang(): ResolvedLanguage {
+        return this.i18n.currentLang;
+    }
+
+    get localeData(): LocaleTree {
+        return this.i18n.localeData;
+    }
 
     async onload(): Promise<void> {
         await this.loadSettings();
@@ -101,71 +86,20 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
         console.debug(this.t('notices.pluginLoaded'));
     }
 
-    normalizeLanguage(languageSetting: string | null | undefined): Language {
-        if (languageSetting === 'auto') {
-            return 'auto';
-        }
-
-        const normalized = String(languageSetting ?? '').toLowerCase();
-        if (normalized.startsWith('zh')) {
-            return 'zh-CN';
-        }
-        if (normalized.startsWith('en')) {
-            return 'en';
-        }
-        return 'en';
-    }
-
     initI18n(): void {
-        const language = this.resolveLanguage(this.settings.language);
-        this.currentLang = language;
-        this.localeData = BUILT_IN_LOCALES[language] ?? BUILT_IN_LOCALES.en;
-    }
-
-    resolveLanguage(languageSetting: Language): ResolvedLanguage {
-        if (languageSetting !== 'auto') {
-            return this.normalizeLanguage(languageSetting) === 'zh-CN' ? 'zh-CN' : 'en';
-        }
-
-        const obsidianLang =
-            window.localStorage.getItem('language') ??
-            navigator.language ??
-            'en';
-
-        return this.normalizeLanguage(obsidianLang) === 'zh-CN' ? 'zh-CN' : 'en';
-    }
-
-    getNestedValue(source: unknown, key: string): unknown {
-        return key.split('.').reduce<unknown>((acc, currentKey) => {
-            if (acc && typeof acc === 'object') {
-                const objectValue = acc as Record<string, unknown>;
-                if (currentKey in objectValue) {
-                    return objectValue[currentKey];
-                }
-            }
-            return undefined;
-        }, source);
-    }
-
-    getLocaleValue(key: string): unknown {
-        return (
-            this.getNestedValue(this.localeData, key) ??
-            this.getNestedValue(BUILT_IN_LOCALES[this.currentLang], key) ??
-            this.getNestedValue(BUILT_IN_LOCALES.en, key)
-        );
+        this.i18n.init(this.settings.language);
     }
 
     t(key: string, params: TranslationParams = {}): string {
-        const rawValue = this.getLocaleValue(key);
-        const template = typeof rawValue === 'string' ? rawValue : key;
+        return this.i18n.t(key, params);
+    }
 
-        return template.replace(/\{(\w+)\}/g, (match, paramKey) => {
-            return params[paramKey] !== undefined ? String(params[paramKey]) : match;
-        });
+    getLocaleValue(key: string): unknown {
+        return this.i18n.getLocaleValue(key);
     }
 
     async setLanguage(language: string): Promise<void> {
-        this.settings.language = this.normalizeLanguage(language);
+        this.settings.language = this.i18n.normalizeLanguage(language);
         this.initI18n();
         await this.saveSettings();
 
@@ -189,7 +123,7 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
 
         try {
             const content = await this.app.vault.read(activeFile);
-            const processedContent = this.processText(content, maxLines);
+            const processedContent = processText(content, maxLines, this.settings);
 
             if (content !== processedContent) {
                 await this.app.vault.modify(activeFile, processedContent);
@@ -221,7 +155,7 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
         }
 
         const selection = currentEditor.getSelection();
-        const processed = this.processText(selection, maxLines);
+        const processed = processText(selection, maxLines, this.settings);
 
         if (selection !== processed) {
             currentEditor.replaceSelection(processed);
@@ -229,46 +163,6 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
         } else {
             new Notice(this.t('notices.noEmptyLines'));
         }
-    }
-
-    processText(text: string, maxEmptyLines: number): string {
-        const lines = text.split('\n');
-        const processedLines: string[] = [];
-        let emptyLineCount = 0;
-
-        for (const line of lines) {
-            if (this.isEmptyLine(line)) {
-                emptyLineCount += 1;
-                if (emptyLineCount <= maxEmptyLines) {
-                    processedLines.push('');
-                }
-            } else {
-                emptyLineCount = 0;
-                processedLines.push(line);
-            }
-        }
-
-        let tailEmpty = 0;
-        for (let i = processedLines.length - 1; i >= 0; i -= 1) {
-            if (this.isEmptyLine(processedLines[i])) {
-                tailEmpty += 1;
-            } else {
-                break;
-            }
-        }
-
-        if (tailEmpty > maxEmptyLines) {
-            processedLines.splice(processedLines.length - (tailEmpty - maxEmptyLines));
-        }
-
-        return processedLines.join('\n');
-    }
-
-    isEmptyLine(line: string): boolean {
-        if (this.settings.whitespaceOnlyLinesAsEmpty) {
-            return line.trim() === '';
-        }
-        return line === '';
     }
 
     async loadSettings(): Promise<void> {
@@ -279,7 +173,7 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
                 saved?.preserveIndentation ??
                 DEFAULT_SETTINGS.whitespaceOnlyLinesAsEmpty,
         });
-        this.settings.language = this.normalizeLanguage(this.settings.language);
+        this.settings.language = this.i18n.normalizeLanguage(this.settings.language);
     }
 
     async saveSettings(): Promise<void> {
@@ -291,107 +185,5 @@ export default class DeleteEmptyLinesPlugin extends Plugin {
 
     onunload(): void {
         console.debug(this.t('notices.pluginUnloaded'));
-    }
-}
-
-class DeleteEmptyLinesSettingTab extends PluginSettingTab {
-    plugin: DeleteEmptyLinesPlugin;
-
-    constructor(app: App, plugin: DeleteEmptyLinesPlugin) {
-        super(app, plugin);
-        this.plugin = plugin;
-    }
-
-    display(): void {
-        const { containerEl } = this;
-        containerEl.empty();
-
-        new Setting(containerEl)
-            .setName(this.plugin.t('settings.title'))
-            .setHeading();
-
-        new Setting(containerEl)
-            .setName(this.plugin.t('settings.language.name'))
-            .setDesc(this.plugin.t('settings.language.desc'))
-            .addDropdown((dropdown) => {
-                const options = this.plugin.getLocaleValue('settings.language.options');
-                const optionMap = options && typeof options === 'object'
-                    ? (options as Record<string, string>)
-                    : {};
-
-                dropdown.addOption('auto', optionMap.auto ?? this.plugin.t('settings.language.options.auto'));
-                dropdown.addOption('zh-CN', optionMap['zh-CN'] ?? this.plugin.t('settings.language.options.zh-CN'));
-                dropdown.addOption('en', optionMap.en ?? this.plugin.t('settings.language.options.en'));
-                dropdown.setValue(this.plugin.settings.language);
-                dropdown.onChange(async (value) => {
-                    await this.plugin.setLanguage(value);
-                });
-            });
-
-        new Setting(containerEl)
-            .setName(this.plugin.t('settings.whitespaceOnlyLinesAsEmpty.name'))
-            .setDesc(this.plugin.t('settings.whitespaceOnlyLinesAsEmpty.desc'))
-            .addToggle((toggle) => {
-                toggle
-                    .setValue(this.plugin.settings.whitespaceOnlyLinesAsEmpty)
-                    .onChange(async (value) => {
-                        this.plugin.settings.whitespaceOnlyLinesAsEmpty = value;
-                        await this.plugin.saveSettings();
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName(this.plugin.t('settings.defaultFullMaxLines.name'))
-            .setDesc(this.plugin.t('settings.defaultFullMaxLines.desc'))
-            .addText((text) => {
-                text
-                    .setValue(String(this.plugin.settings.defaultFullMaxLines))
-                    .setPlaceholder(this.plugin.t('settings.numberInputPlaceholder'))
-                    .onChange(async (value) => {
-                        const num = Number.parseInt(value, 10);
-                        if (!Number.isNaN(num) && num >= 0) {
-                            this.plugin.settings.defaultFullMaxLines = num;
-                            await this.plugin.saveSettings();
-                            this.display();
-                        } else {
-                            text.setValue(String(this.plugin.settings.defaultFullMaxLines));
-                            new Notice(this.plugin.t('notices.invalidNumber'));
-                        }
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName(this.plugin.t('settings.defaultSelectionMaxLines.name'))
-            .setDesc(this.plugin.t('settings.defaultSelectionMaxLines.desc'))
-            .addText((text) => {
-                text
-                    .setValue(String(this.plugin.settings.defaultSelectionMaxLines))
-                    .setPlaceholder(this.plugin.t('settings.numberInputPlaceholder'))
-                    .onChange(async (value) => {
-                        const num = Number.parseInt(value, 10);
-                        if (!Number.isNaN(num) && num >= 0) {
-                            this.plugin.settings.defaultSelectionMaxLines = num;
-                            await this.plugin.saveSettings();
-                            this.display();
-                        } else {
-                            text.setValue(String(this.plugin.settings.defaultSelectionMaxLines));
-                            new Notice(this.plugin.t('notices.invalidNumber'));
-                        }
-                    });
-            });
-
-        new Setting(containerEl)
-            .setName(this.plugin.t('settings.usage.title'))
-            .setHeading();
-
-        const usageEl = containerEl.createEl('div', { cls: 'setting-item-description' });
-        this.createUsageParagraph(usageEl, 'settings.usage.commandPalette', 'settings.usage.commandPaletteDesc');
-        this.createUsageParagraph(usageEl, 'settings.usage.contextMenu', 'settings.usage.contextMenuDesc');
-    }
-
-    createUsageParagraph(containerEl: HTMLElement, labelKey: string, descKey: string): void {
-        const paragraph = containerEl.createEl('p');
-        paragraph.createEl('strong', { text: `${this.plugin.t(labelKey)}: ` });
-        paragraph.appendChild(document.createTextNode(this.plugin.t(descKey)));
     }
 }
