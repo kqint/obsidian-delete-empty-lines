@@ -1,8 +1,8 @@
 # Obsidian Delete Empty Lines
 
-Delete or compress empty lines in your notes. Supports processing the entire document or only the selected content.
+[简体中文](./README.zh-CN.md) | [English](./README.md)
 
-[中文文档](./README.zh-CN.md)
+Delete or compress empty lines in your notes. Supports processing the entire document or only the selected content.
 
 ## Demo
 
